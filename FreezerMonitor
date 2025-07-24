@@ -1,8 +1,8 @@
 blueprint:
-  name: Freezer Door Alert with Light Restore (Opening/Closed)
+  name: Freezer Door Alert with Light Restore
   description: >
-    When a freezer door is in 'Opened' state longer than a configured delay, change the light color/brightness.
-    When the door returns to 'Closed', restore original light state (on/off, color, brightness).
+    When a freezer door stays open longer than a set time, turn on a light with a specified color and brightness.
+    When the door is closed, return the light to its original state (on/off, color, brightness).
   domain: automation
   input:
     door_sensor:
@@ -10,6 +10,7 @@ blueprint:
       selector:
         entity:
           domain: binary_sensor
+          device_class: door
     light_entity:
       name: Light to Alert With
       selector:
@@ -30,7 +31,7 @@ blueprint:
       selector:
         color_rgb: {}
     alert_brightness:
-      name: Alert Brightness (0–255)
+      name: Alert Brightness (0-255)
       default: 200
       selector:
         number:
@@ -49,7 +50,7 @@ max_exceeded: silent
 trigger:
   - platform: state
     entity_id: !input door_sensor
-    to: 'Opened'
+    to: 'on'
 
 variables:
   light: !input light_entity
@@ -67,7 +68,7 @@ action:
   - wait_for_trigger:
       - platform: state
         entity_id: !input door_sensor
-        to: 'Closed'
+        to: 'off'
     timeout: !input delay_time
     continue_on_timeout: true
 
@@ -75,7 +76,7 @@ action:
       - conditions:
           - condition: state
             entity_id: !input door_sensor
-            state: 'Opened'
+            state: 'on'
         sequence:
           - service: light.turn_on
             target:
@@ -86,11 +87,11 @@ action:
           - service: "{{ notify_service }}"
             data:
               title: "Freezer Door Left Open"
-              message: "The freezer door has been in 'Opening' state for more than {{ delay_time }} seconds!"
+              message: "⚠️ The freezer door has been open for more than {{ delay_time }} seconds!"
       - conditions:
           - condition: state
             entity_id: !input door_sensor
-            state: 'Closed'
+            state: 'off'
         sequence:
           - choose:
               - conditions:
