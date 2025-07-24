@@ -1,119 +1,77 @@
 blueprint:
-  name: Freezer Door Alert with Light Restore
+  name: Door Open Alarm Light
   description: >
-    When a freezer door stays open longer than a set time, turn on a light with a specified color and brightness.
-    When the door is closed, return the light to its original state (on/off, color, brightness).
+    Turn on a light with a specific color when a door is opened, and restore its
+    previous state when the door is closed.
   domain: automation
   input:
     door_sensor:
-      name: Freezer Door Sensor
+      name: Door Sensor
+      description: The door sensor entity.
       selector:
         entity:
           domain: binary_sensor
-    light_entity:
-      name: Light to Alert With
+          device_class: door
+    light:
+      name: Light
+      description: The light entity to control.
       selector:
         entity:
           domain: light
-    delay_time:
-      name: Delay Time (seconds)
-      default: 60
+    alarm_color:
+      name: Alarm Color
+      description: The color to set the light to when the door opens.
+      default: red
+      selector:
+        color: {}
+    alarm_brightness:
+      name: Alarm Brightness
+      description: The brightness to set the light to when the door opens (optional).
+      default: 255
       selector:
         number:
-          min: 5
-          max: 600
-          unit_of_measurement: seconds
-          mode: slider
-    alert_color:
-      name: Alert Color (RGB)
-      default: [255, 0, 0]
-      selector:
-        color_rgb: {}
-    alert_brightness:
-      name: Alert Brightness (0-255)
-      default: 200
-      selector:
-        number:
-          min: 1
+          min: 0
           max: 255
-          mode: slider
-
-mode: restart
-max_exceeded: silent
+          step: 1
 
 trigger:
   - platform: state
     entity_id: !input door_sensor
+    from: 'off'
     to: 'on'
   - platform: state
     entity_id: !input door_sensor
+    from: 'on'
     to: 'off'
-
-variables:
-  light: !input light_entity
-  alert_color: !input alert_color
-  alert_brightness: !input alert_brightness
-
-  light_was_on: >
-    {{ is_state(light, 'on') }}
-  light_rgb: >
-    {% set color = state_attr(light, 'rgb_color') %}
-    {{ color if color is not none else [255, 255, 255] }}
-  light_brightness: >
-    {% set bright = state_attr(light, 'brightness') %}
-    {{ bright if bright is not none else 255 }}
-
+condition: []
 action:
+  - variables:
+      scene_id: "{{ trigger.to_state.context.id }}"
+      light_entity: !input light
+      alarm_color: !input alarm_color
+      alarm_brightness: !input alarm_brightness
   - choose:
       - conditions:
           - condition: trigger
-            id: '0'  # door opened
-          - condition: state
-            entity_id: !input door_sensor
-            state: 'on'
+            id: "0"
         sequence:
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input door_sensor
-                to: 'off'
-            timeout: !input delay_time
-            continue_on_timeout: true
-
-          - choose:
-              - conditions:
-                  - condition: state
-                    entity_id: !input door_sensor
-                    state: 'on'
-                sequence:
-                  - service: light.turn_on
-                    target:
-                      entity_id: "{{ light }}"
-                    data:
-                      rgb_color: "{{ alert_color }}"
-                      brightness: "{{ alert_brightness }}"
-
+          - service: scene.create
+            data:
+              scene_id: "scene_{{ scene_id }}"
+              snapshot_entities: "{{ light_entity }}"
+          - service: light.turn_on
+            target:
+              entity_id: "{{ light_entity }}"
+            data:
+              color_name: "{{ alarm_color }}"
+              brightness: "{{ alarm_brightness }}"
       - conditions:
           - condition: trigger
-            id: '1'  # door closed
-          - condition: state
-            entity_id: !input door_sensor
-            state: 'off'
+            id: "1"
         sequence:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ light_was_on }}"
-                sequence:
-                  - service: light.turn_on
-                    target:
-                      entity_id: "{{ light }}"
-                    data:
-                      rgb_color: "{{ light_rgb }}"
-                      brightness: "{{ light_brightness }}"
-              - conditions:
-                  - condition: template
-                    value_template: "{{ not light_was_on }}"
-                sequence:
-                  - service: light.turn_off
-                    target:
-                      entity_id: "{{ light }}"
+          - service: scene.turn_on
+            target:
+              entity_id: "scene_{{ scene_id }}"
+          - service: scene.delete
+            target:
+              entity_id: "scene_{{ scene_id }}"
