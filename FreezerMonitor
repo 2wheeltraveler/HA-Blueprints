@@ -18,7 +18,7 @@ blueprint:
     alarm_color:
       name: Alarm Color
       description: The color to set the light to when the door opens (e.g., "red", "blue", or RGB values).
-      default: "red"
+      default: [255, 0, 0]
       selector:
         color_rgb:
 
