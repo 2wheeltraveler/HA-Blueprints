@@ -72,7 +72,7 @@ action:
   - wait_for_trigger:
       - platform: state
         entity_id: !input door_sensor
-        to: 'off'
+        to: 'Closed'
     timeout: !input delay_time
     continue_on_timeout: true
 
@@ -91,11 +91,11 @@ action:
           - service: "{{ notify_service }}"
             data:
               title: "Freezer Door Left Open"
-              message: "Freezer door has been in 'Opening' state for more than {{ delay_time }} seconds!"
+              message: "Freezer door has been open for more than {{ delay_time }} seconds!"
       - conditions:
           - condition: state
             entity_id: !input door_sensor
-            state: 'off'
+            state: 'Closed'
         sequence:
           - choose:
               - conditions:
