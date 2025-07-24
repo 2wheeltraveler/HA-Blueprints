@@ -1,0 +1,117 @@
+blueprint:
+  name: Freezer Door Alert with Light and Notification
+  description: >
+    Turns on a light to a specified color/brightness and sends a mobile notification
+    if a freezer (or door) is left open longer than a set time. Restores previous light
+    state when door is closed.
+  domain: automation
+  input:
+    door_sensor:
+      name: Door Sensor
+      description: Binary sensor that becomes 'on' when the door is open.
+      selector:
+        entity:
+          domain: binary_sensor
+    light_entity:
+      name: Light
+      description: The light to control.
+      selector:
+        entity:
+          domain: light
+    delay_time:
+      name: Delay Time (seconds)
+      description: Time the door must remain open before triggering the alert.
+      default: 60
+      selector:
+        number:
+          min: 5
+          max: 600
+          unit_of_measurement: seconds
+          mode: slider
+    alert_color:
+      name: Alert Color (RGB)
+      description: The color to set the light to if the door stays open too long.
+      default: [255, 0, 0]
+      selector:
+        color_rgb: {}
+    alert_brightness:
+      name: Alert Brightness
+      description: Brightness level (0–255) when alert is triggered.
+      default: 200
+      selector:
+        number:
+          min: 1
+          max: 255
+          mode: slider
+    notify_device:
+      name: Mobile Device for Notification
+      description: The device to send a mobile push notification to.
+      selector:
+        device:
+          integration: mobile_app
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input door_sensor
+    to: 'on'
+
+variables:
+  light: !input light_entity
+  alert_color: !input alert_color
+  alert_brightness: !input alert_brightness
+
+action:
+  - variables:
+      previous_state: "{{ states(light) }}"
+      previous_attributes: "{{ state_attr(light, 'rgb_color') | default([255,255,255]) }}"
+      previous_brightness: "{{ state_attr(light, 'brightness') | default(255) }}"
+
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input door_sensor
+        to: 'off'
+    timeout: !input delay_time
+    continue_on_timeout: true
+
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input door_sensor
+            state: 'on'
+        sequence:
+          - service: light.turn_on
+            target:
+              entity_id: "{{ light }}"
+            data:
+              rgb_color: "{{ alert_color }}"
+              brightness: "{{ alert_brightness }}"
+          - service: notify.mobile_app_{{ device_attr('!input notify_device', 'name') | lower | replace(' ', '_') }}
+            data:
+              message: "Freezer door has been open for more than {{ delay_time }} seconds!"
+              title: "Freezer Alert"
+      - conditions:
+          - condition: state
+            entity_id: !input door_sensor
+            state: 'off'
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ previous_state == 'on' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ light }}"
+                    data:
+                      rgb_color: "{{ previous_attributes }}"
+                      brightness: "{{ previous_brightness }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ previous_state == 'off' }}"
+                sequence:
+                  - service: light.turn_off
+                    target:
+                      entity_id: "{{ light }}"
