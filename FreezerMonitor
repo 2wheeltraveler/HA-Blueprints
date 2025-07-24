@@ -94,7 +94,7 @@ action:
 
           - service: notify.notify
             data:
-              message: "Freezer door has been left open for more than {{ wait_time }} seconds!"
+              message: "Freezer door has been left open for more than {{ wait_time }} minutes!"
               target: !input notify_devices
 
   - choose:
