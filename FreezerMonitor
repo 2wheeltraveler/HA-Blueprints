@@ -49,7 +49,7 @@ max_exceeded: silent
 trigger:
   - platform: state
     entity_id: !input door_sensor
-    to: 'Opening'
+    to: 'on'
 
 variables:
   light: !input light_entity
@@ -72,7 +72,7 @@ action:
   - wait_for_trigger:
       - platform: state
         entity_id: !input door_sensor
-        to: 'Closed'
+        to: 'off'
     timeout: !input delay_time
     continue_on_timeout: true
 
@@ -80,7 +80,7 @@ action:
       - conditions:
           - condition: state
             entity_id: !input door_sensor
-            state: 'Opening'
+            state: 'on'
         sequence:
           - service: light.turn_on
             target:
@@ -95,7 +95,7 @@ action:
       - conditions:
           - condition: state
             entity_id: !input door_sensor
-            state: 'Closed'
+            state: 'off'
         sequence:
           - choose:
               - conditions:
