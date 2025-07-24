@@ -72,7 +72,7 @@ action:
   - wait_for_trigger:
       - platform: state
         entity_id: !input door_sensor
-        to: 'off'
+        to: 'Closed'
     timeout: !input delay_time
     continue_on_timeout: true
 
