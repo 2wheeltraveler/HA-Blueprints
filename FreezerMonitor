@@ -1,77 +1,50 @@
 blueprint:
-  name: Door Open Alarm Light
-  description: >
-    Turn on a light with a specific color when a door is opened, and restore its
-    previous state when the door is closed.
+  name: Door-activated Alarm Light with State Restore
+  description: Turns on a light and sets color when a door opens, then restores the light's previous state when the door closes.
   domain: automation
   input:
     door_sensor:
       name: Door Sensor
-      description: The door sensor entity.
+      description: The binary sensor for your door.
       selector:
         entity:
           domain: binary_sensor
-          device_class: door
-    light:
-      name: Light
-      description: The light entity to control.
+    target_light:
+      name: Target Light
+      description: The light entity or group of lights to be used as an alarm.
       selector:
         entity:
           domain: light
     alarm_color:
       name: Alarm Color
-      description: The color to set the light to when the door opens.
-      default: red
+      description: The color to set the light to when the door opens (e.g., "red", "blue", or RGB values).
+      default: "red"
       selector:
-        color: {}
-    alarm_brightness:
-      name: Alarm Brightness
-      description: The brightness to set the light to when the door opens (optional).
-      default: 255
-      selector:
-        number:
-          min: 0
-          max: 255
-          step: 1
+        color_rgb:
 
 trigger:
-  - platform: state
-    entity_id: !input door_sensor
-    from: 'off'
-    to: 'on'
-  - platform: state
-    entity_id: !input door_sensor
-    from: 'on'
-    to: 'off'
-condition: []
+  platform: state
+  entity_id: !input door_sensor
+  from: "off"  # Or "closed" depending on your sensor's state representation
+  to: "on"     # Or "open"
+
 action:
-  - variables:
-      scene_id: "{{ trigger.to_state.context.id }}"
-      light_entity: !input light
-      alarm_color: !input alarm_color
-      alarm_brightness: !input alarm_brightness
-  - choose:
-      - conditions:
-          - condition: trigger
-            id: "0"
-        sequence:
-          - service: scene.create
-            data:
-              scene_id: "scene_{{ scene_id }}"
-              snapshot_entities: "{{ light_entity }}"
-          - service: light.turn_on
-            target:
-              entity_id: "{{ light_entity }}"
-            data:
-              color_name: "{{ alarm_color }}"
-              brightness: "{{ alarm_brightness }}"
-      - conditions:
-          - condition: trigger
-            id: "1"
-        sequence:
-          - service: scene.turn_on
-            target:
-              entity_id: "scene_{{ scene_id }}"
-          - service: scene.delete
-            target:
-              entity_id: "scene_{{ scene_id }}"
+  - service: scene.create
+    data:
+      scene_id: door_alarm_snapshot
+      snapshot_entities:
+        - !input target_light
+  - service: light.turn_on
+    data:
+      entity_id: !input target_light
+      color_name: !input alarm_color  # Or use rgb_color: [255, 0, 0] for red
+  - wait_for_trigger:
+      platform: state
+      entity_id: !input door_sensor
+      from: "on"
+      to: "off"
+  - service: scene.turn_on
+    target:
+      entity_id: scene.door_alarm_snapshot
+
+mode: single
