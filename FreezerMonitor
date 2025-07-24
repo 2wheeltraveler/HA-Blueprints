@@ -37,11 +37,6 @@ blueprint:
           min: 1
           max: 255
           mode: slider
-    notify_device:
-      name: Notify Device
-      selector:
-        device:
-          integration: mobile_app
 
 mode: restart
 max_exceeded: silent
@@ -58,8 +53,6 @@ variables:
   light: !input light_entity
   alert_color: !input alert_color
   alert_brightness: !input alert_brightness
-  notify_service: >
-    notify.mobile_app_{{ device_attr('!input notify_device', 'name') | lower | replace(' ', '_') }}
 
   light_was_on: >
     {{ is_state(light, 'on') }}
@@ -98,10 +91,6 @@ action:
                     data:
                       rgb_color: "{{ alert_color }}"
                       brightness: "{{ alert_brightness }}"
-                  - service: "{{ notify_service }}"
-                    data:
-                      title: "Freezer Door Left Open"
-                      message: "The freezer door has been open for more than {{ delay_time }} seconds!"
 
       - conditions:
           - condition: trigger
