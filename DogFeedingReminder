@@ -1,0 +1,92 @@
+blueprint:
+  name: Dog Feeding Reminder with Motion Sensor
+  description: >
+    Sends a notification if motion hasn't been detected in the dog food bin by a set time in the morning and evening.
+    Also sends a notification when motion *is* detected to confirm the dogs were fed.
+  domain: automation
+  input:
+    motion_sensor:
+      name: Motion Sensor
+      description: Motion sensor inside the dog food bin.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+
+    notify_device:
+      name: Mobile Device for Notifications
+      selector:
+        device:
+          integration: mobile_app
+
+    morning_check_time:
+      name: Morning Check Time
+      description: Time to check if dogs were fed in the morning.
+      default: "08:00:00"
+      selector:
+        time: {}
+
+    evening_check_time:
+      name: Evening Check Time
+      description: Time to check if dogs were fed in the evening.
+      default: "18:00:00"
+      selector:
+        time: {}
+
+    motion_window_minutes:
+      name: Lookback Window (Minutes)
+      description: Number of minutes before the check time to look for motion.
+      default: 90
+      selector:
+        number:
+          min: 10
+          max: 240
+          unit_of_measurement: minutes
+          mode: slider
+
+mode: parallel
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    to: 'on'
+  - platform: time
+    at: !input morning_check_time
+    id: morning_check
+  - platform: time
+    at: !input evening_check_time
+    id: evening_check
+
+variables:
+  notify_service: >
+    notify.mobile_app_{{ device_attr('!input notify_device', 'name') | lower | replace(' ', '_') }}
+  motion_sensor_entity: !input motion_sensor
+  lookback_minutes: !input motion_window_minutes
+
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.platform == 'state' }}"
+        sequence:
+          - service: "{{ notify_service }}"
+            data:
+              message: "✅ Dogs have been fed (motion detected in bin)."
+              title: "Dog Feeding"
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id in ['morning_check', 'evening_check'] }}
+        sequence:
+          - variables:
+              recent_motion: >
+                {{ (now() - timedelta(minutes=lookback_minutes)) < (states[motion_sensor_entity].last_changed) }}
+          - condition: template
+            value_template: "{{ not recent_motion }}"
+          - service: "{{ notify_service }}"
+            data:
+              message: >
+                ⚠️ No motion detected in the dog food bin in the last {{ lookback_minutes }} minutes.
+                {{ 'Morning' if trigger.id == 'morning_check' else 'Evening' }} feeding may have been missed.
+              title: "Dog Feeding Reminder"
