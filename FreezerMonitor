@@ -102,7 +102,7 @@ action:
                   - service: "{{ notify_service }}"
                     data:
                       title: "Freezer Door Left Open"
-                      message: "⚠️ The freezer door has been open for more than {{ delay_time }} seconds!"
+                      message: "The freezer door has been open for more than {{ delay_time }} seconds!"
 
       - conditions:
           - condition: trigger
